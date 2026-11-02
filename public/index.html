@@ -1,0 +1,1111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#0b1120" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>LiveTrack 24/7 — Device Location Beacon</title>
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    :root {
+      --bg-primary: #0b1120;
+      --bg-card: #131c31;
+      --bg-card-alt: #1a2642;
+      --border: #263554;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent: #10b981;
+      --accent-glow: rgba(16, 185, 129, 0.28);
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --blue: #3b82f6;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, sans-serif;
+    }
+
+    body {
+      background: var(--bg-primary);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 16px;
+    }
+
+    .app-container {
+      width: 100%;
+      max-width: 460px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    /* Header Bar */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      padding: 14px 16px;
+      border-radius: 16px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .beacon-dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--text-muted);
+      position: relative;
+      transition: background 0.3s;
+    }
+
+    .beacon-dot.active {
+      background: var(--accent);
+      box-shadow: 0 0 14px var(--accent);
+    }
+
+    .beacon-dot.active::after {
+      content: "";
+      position: absolute;
+      inset: -6px;
+      border-radius: 50%;
+      border: 2px solid var(--accent);
+      animation: pulse 1.8s infinite ease-out;
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(0.7); opacity: 1; }
+      100% { transform: scale(1.9); opacity: 0; }
+    }
+
+    .brand-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+
+    .brand-sub {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .conn-pill {
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 5px 10px;
+      border-radius: 999px;
+      background: rgba(148, 163, 184, 0.15);
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .conn-pill.connected {
+      background: rgba(16, 185, 129, 0.16);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.35);
+    }
+
+    .conn-pill.offline {
+      background: rgba(245, 158, 11, 0.18);
+      color: #fbbf24;
+      border: 1px solid rgba(245, 158, 11, 0.35);
+    }
+
+    /* Card */
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 16px;
+    }
+
+    .field-label {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .text-input {
+      flex: 1;
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      color: var(--text-main);
+      padding: 11px 14px;
+      border-radius: 10px;
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .text-input:focus {
+      border-color: var(--accent);
+    }
+
+    /* Primary Action Button */
+    .btn-primary {
+      width: 100%;
+      padding: 15px 18px;
+      border-radius: 12px;
+      border: none;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      background: linear-gradient(135deg, #10b981, #059669);
+      color: #042f2e;
+      box-shadow: 0 6px 20px var(--accent-glow);
+      transition: transform 0.15s, opacity 0.2s;
+    }
+
+    .btn-primary:active {
+      transform: scale(0.98);
+    }
+
+    .btn-primary.active-tracking {
+      background: linear-gradient(135deg, #1e293b, #0f172a);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.45);
+      box-shadow: none;
+    }
+
+    .btn-secondary {
+      width: 100%;
+      margin-top: 8px;
+      padding: 10px 14px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--bg-card-alt);
+      color: var(--text-main);
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .btn-secondary:hover {
+      background: #233256;
+    }
+
+    /* Telemetry Grid */
+    .telemetry-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+    }
+
+    .metric-box {
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 11px 12px;
+    }
+
+    .metric-label {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .metric-value {
+      font-size: 1.02rem;
+      font-weight: 700;
+      margin-top: 4px;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .metric-sub {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    /* Mini Map */
+    #miniMap {
+      width: 100%;
+      height: 195px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      overflow: hidden;
+      background: #090d16;
+    }
+
+    /* Status Badges Row */
+    .status-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 4px;
+    }
+
+    .status-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.82rem;
+      padding: 8px 10px;
+      background: var(--bg-primary);
+      border-radius: 10px;
+      border: 1px solid var(--border);
+    }
+
+    .badge {
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 6px;
+    }
+
+    .badge-green {
+      background: rgba(16, 185, 129, 0.18);
+      color: #34d399;
+    }
+
+    .badge-amber {
+      background: rgba(245, 158, 11, 0.18);
+      color: #fbbf24;
+    }
+
+    .badge-blue {
+      background: rgba(59, 130, 246, 0.18);
+      color: #60a5fa;
+    }
+
+    .alert-banner {
+      display: none;
+      background: rgba(245, 158, 11, 0.14);
+      border: 1px solid rgba(245, 158, 11, 0.45);
+      color: #fcd34d;
+      padding: 12px 14px;
+      border-radius: 12px;
+      font-size: 0.82rem;
+      line-height: 1.45;
+    }
+
+    .footer-links {
+      text-align: center;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      padding: 6px 0 16px;
+    }
+
+    .footer-links a {
+      color: #38bdf8;
+      text-decoration: none;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <div class="app-container">
+    <!-- Top Header -->
+    <div class="header">
+      <div class="brand">
+        <div id="beaconDot" class="beacon-dot"></div>
+        <div>
+          <div class="brand-title">LiveTrack 24/7 Beacon</div>
+          <div id="deviceIdText" class="brand-sub">ID: Initializing...</div>
+        </div>
+      </div>
+      <div id="connPill" class="conn-pill">Connecting...</div>
+    </div>
+
+    <!-- Alert / Permission Notice -->
+    <div id="alertBanner" class="alert-banner"></div>
+
+    <!-- Control Card -->
+    <div class="card">
+      <div class="field-label">
+        <span>Your Name / Device Label</span>
+        <span id="trackingStateLabel" style="color: var(--accent);">Standby</span>
+      </div>
+      <div class="input-row">
+        <input
+          id="userNameInput"
+          type="text"
+          class="text-input"
+          placeholder="Enter your name or vehicle ID..."
+          maxlength="40"
+        />
+      </div>
+
+      <div id="serverUrlSection" style="margin-bottom: 12px; display: none;">
+        <div class="field-label">
+          <span>Backend Server URL (APK / Remote Mode)</span>
+        </div>
+        <div class="input-row" style="margin-bottom: 4px;">
+          <input
+            id="serverUrlInput"
+            type="url"
+            class="text-input"
+            placeholder="https://your-server.onrender.com or http://192.168.0.149:3000"
+          />
+          <button class="btn-secondary" style="width:auto; margin-top:0; padding:0 14px;" onclick="saveServerUrlAndReconnect()">
+            Save
+          </button>
+        </div>
+      </div>
+
+      <button id="startBtn" class="btn-primary" onclick="handleStartStopClick()">
+        <span id="startBtnIcon">📍</span>
+        <span id="startBtnText">Allow Permission & Start 24/7 Live Tracking</span>
+      </button>
+
+      <button id="simBtn" class="btn-secondary" onclick="toggleSimulationMode()">
+        🚗 Test Drive Simulation Mode (Demo Moving GPS)
+      </button>
+    </div>
+
+    <!-- Live Coordinates & Telemetry -->
+    <div class="card">
+      <div class="field-label">
+        <span>Live GPS Telemetry</span>
+        <span id="lastSentText">Waiting for GPS lock...</span>
+      </div>
+      <div class="telemetry-grid">
+        <div class="metric-box">
+          <div class="metric-label">Latitude</div>
+          <div id="latVal" class="metric-value">--.------</div>
+          <div id="accVal" class="metric-sub">Accuracy: -- m</div>
+        </div>
+        <div class="metric-box">
+          <div class="metric-label">Longitude</div>
+          <div id="lngVal" class="metric-value">--.------</div>
+          <div id="altVal" class="metric-sub">Heading: --°</div>
+        </div>
+        <div class="metric-box">
+          <div class="metric-label">Live Speed</div>
+          <div id="speedVal" class="metric-value">0.0 km/h</div>
+          <div class="metric-sub">High-Accuracy GPS</div>
+        </div>
+        <div class="metric-box">
+          <div class="metric-label">Packets Sent</div>
+          <div id="packetsVal" class="metric-value">0</div>
+          <div id="queueVal" class="metric-sub">Offline Queue: 0</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mini Live Map Preview -->
+    <div class="card" style="padding: 12px;">
+      <div class="field-label" style="margin-bottom: 8px;">
+        <span>Your Live Position Preview</span>
+        <span id="coordsCopyBtn" style="cursor:pointer; color:#38bdf8;" onclick="forceSendNow()">⚡ Ping Admin Now</span>
+      </div>
+      <div id="miniMap"></div>
+    </div>
+
+    <!-- 24/7 Keep-Alive & Hardware Status -->
+    <div class="card">
+      <div class="field-label"><span>24/7 Keep-Alive & Persistence</span></div>
+      <div class="status-list">
+        <div class="status-item">
+          <span>Screen Wake Lock (Prevent Sleep)</span>
+          <span id="wakeLockBadge" class="badge badge-amber">Inactive</span>
+        </div>
+        <div class="status-item">
+          <span>Background Keep-Alive Engine</span>
+          <span id="bgEngineBadge" class="badge badge-blue">Standby</span>
+        </div>
+        <div class="status-item">
+          <span>Device Battery Telemetry</span>
+          <span id="batteryBadge" class="badge badge-green">Detecting...</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer-links">
+      Streaming live to <a id="adminDashboardLink" href="/admin" target="_blank">Open Live Admin Map Dashboard ↗</a>
+      &nbsp;|&nbsp;
+      <a href="javascript:void(0)" onclick="toggleServerUrlBox()">⚙️ Server Config</a>
+    </div>
+  </div>
+
+  <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    // ==================== DEVICE IDENTITY & SERVER CONFIG ====================
+    const DEFAULT_APK_SERVER_URL = 'http://192.168.0.149:3000'; // Change to your Render/Railway HTTPS URL for global 4G/5G APK
+    const STORAGE_KEY_ID = 'lt_24x7_device_id';
+    const STORAGE_KEY_NAME = 'lt_24x7_user_name';
+    const STORAGE_KEY_QUEUE = 'lt_24x7_offline_queue';
+    const STORAGE_KEY_AUTOSTART = 'lt_24x7_autostart';
+    const STORAGE_KEY_SERVER_URL = 'lt_24x7_server_url';
+
+    function isRunningInNativeApk() {
+      return Boolean(
+        (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) ||
+        window.location.protocol === 'file:' ||
+        window.location.origin === 'https://localhost' ||
+        window.location.origin === 'http://localhost'
+      );
+    }
+
+    function getServerUrl() {
+      const saved = localStorage.getItem(STORAGE_KEY_SERVER_URL);
+      if (saved && saved.trim()) {
+        return saved.trim().replace(/\/+$/, '');
+      }
+      if (isRunningInNativeApk()) {
+        return DEFAULT_APK_SERVER_URL;
+      }
+      return window.location.origin;
+    }
+
+    const serverUrlInput = document.getElementById('serverUrlInput');
+    serverUrlInput.value = getServerUrl();
+    document.getElementById('adminDashboardLink').href = `${getServerUrl()}/admin`;
+
+    if (isRunningInNativeApk()) {
+      document.getElementById('serverUrlSection').style.display = 'block';
+    }
+
+    function toggleServerUrlBox() {
+      const el = document.getElementById('serverUrlSection');
+      el.style.display = el.style.display === 'none' ? 'block' : 'none';
+    }
+
+    function saveServerUrlAndReconnect() {
+      const val = serverUrlInput.value.trim().replace(/\/+$/, '');
+      if (val) {
+        localStorage.setItem(STORAGE_KEY_SERVER_URL, val);
+        document.getElementById('adminDashboardLink').href = `${val}/admin`;
+        window.location.reload();
+      }
+    }
+
+    function getOrCreateDeviceId() {
+      let id = localStorage.getItem(STORAGE_KEY_ID);
+      if (!id) {
+        const rand = Math.random().toString(36).substring(2, 8).toUpperCase();
+        id = 'DEV-' + rand;
+        localStorage.setItem(STORAGE_KEY_ID, id);
+      }
+      return id;
+    }
+
+    const deviceId = getOrCreateDeviceId();
+    document.getElementById('deviceIdText').textContent = `ID: ${deviceId}`;
+
+    // Check URL params for pre-assigned name (?name=Driver1)
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlName = urlParams.get('name') || urlParams.get('user');
+    const savedName = urlName || localStorage.getItem(STORAGE_KEY_NAME) || `Mobile-${deviceId.slice(-4)}`;
+
+    const userNameInput = document.getElementById('userNameInput');
+    userNameInput.value = savedName;
+    if (urlName) {
+      localStorage.setItem(STORAGE_KEY_NAME, urlName);
+    }
+
+    userNameInput.addEventListener('change', () => {
+      const val = userNameInput.value.trim() || `Mobile-${deviceId.slice(-4)}`;
+      localStorage.setItem(STORAGE_KEY_NAME, val);
+      registerWithServer();
+    });
+
+    // ==================== STATE ====================
+    let isTracking = false;
+    let isSimulating = false;
+    let watchId = null;
+    let pollTimer = null;
+    let heartbeatTimer = null;
+    let simTimer = null;
+    let wakeLockSentinel = null;
+    let keepAliveAudioCtx = null;
+
+    let packetsSent = 0;
+    let lastPosition = null;
+    let batteryLevel = null;
+    let isCharging = false;
+
+    // Offline Queue in localStorage
+    function getOfflineQueue() {
+      try {
+        return JSON.parse(localStorage.getItem(STORAGE_KEY_QUEUE) || '[]');
+      } catch {
+        return [];
+      }
+    }
+
+    function saveOfflineQueue(q) {
+      try {
+        // Keep max 300 points in localStorage
+        const trimmed = q.slice(-300);
+        localStorage.setItem(STORAGE_KEY_QUEUE, JSON.stringify(trimmed));
+        document.getElementById('queueVal').textContent = `Offline Queue: ${trimmed.length}`;
+      } catch (e) {}
+    }
+
+    // ==================== MINI LEAFLET MAP ====================
+    const miniMap = L.map('miniMap', {
+      zoomControl: false,
+      attributionControl: false
+    }).setView([20.5937, 78.9629], 4);
+
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      maxZoom: 19
+    }).addTo(miniMap);
+
+    let userMarker = null;
+    let userCircle = null;
+
+    function updateMiniMap(lat, lng, accuracy) {
+      if (!userMarker) {
+        const icon = L.divIcon({
+          className: '',
+          html: `<div style="width:16px;height:16px;border-radius:50%;background:#10b981;border:3px solid #fff;box-shadow:0 0 12px #10b981;"></div>`,
+          iconSize: [16, 16],
+          iconAnchor: [8, 8]
+        });
+        userMarker = L.marker([lat, lng], { icon }).addTo(miniMap);
+        userCircle = L.circle([lat, lng], {
+          radius: accuracy || 15,
+          color: '#10b981',
+          fillColor: '#10b981',
+          fillOpacity: 0.15,
+          weight: 1
+        }).addTo(miniMap);
+        miniMap.setView([lat, lng], 16);
+      } else {
+        userMarker.setLatLng([lat, lng]);
+        userCircle.setLatLng([lat, lng]);
+        userCircle.setRadius(accuracy || 15);
+        miniMap.panTo([lat, lng], { animate: true });
+      }
+    }
+
+    // ==================== BATTERY API ====================
+    async function initBatteryMonitor() {
+      const badge = document.getElementById('batteryBadge');
+      if ('getBattery' in navigator) {
+        try {
+          const battery = await navigator.getBattery();
+          const updateBat = () => {
+            batteryLevel = Math.round(battery.level * 100);
+            isCharging = battery.charging;
+            badge.textContent = `${batteryLevel}% ${isCharging ? '⚡ Charging' : 'Battery'}`;
+          };
+          updateBat();
+          battery.addEventListener('levelchange', updateBat);
+          battery.addEventListener('chargingchange', updateBat);
+        } catch {
+          badge.textContent = 'Not Reported';
+        }
+      } else {
+        badge.textContent = 'Standard Power';
+      }
+    }
+    initBatteryMonitor();
+
+    // ==================== SCREEN WAKE LOCK & KEEP-ALIVE ====================
+    async function requestWakeLock() {
+      const badge = document.getElementById('wakeLockBadge');
+      if ('wakeLock' in navigator) {
+        try {
+          wakeLockSentinel = await navigator.wakeLock.request('screen');
+          badge.textContent = 'Active (Screen Stay-Awake)';
+          badge.className = 'badge badge-green';
+          wakeLockSentinel.addEventListener('release', () => {
+            badge.textContent = 'Released';
+            badge.className = 'badge badge-amber';
+          });
+        } catch (err) {
+          badge.textContent = 'Browser Restricted';
+          badge.className = 'badge badge-amber';
+        }
+      } else {
+        badge.textContent = 'Unsupported on OS';
+      }
+    }
+
+    // Re-acquire Wake Lock whenever page returns to foreground
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && isTracking) {
+        requestWakeLock();
+        forceSendNow();
+      }
+    });
+
+    // Silent Audio Oscillator prevents mobile browsers from suspending JS timers in background
+    function startSilentAudioKeepAlive() {
+      try {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextClass) return;
+        if (!keepAliveAudioCtx) {
+          keepAliveAudioCtx = new AudioContextClass();
+          const osc = keepAliveAudioCtx.createOscillator();
+          const gain = keepAliveAudioCtx.createGain();
+          gain.gain.value = 0.00001; // Completely inaudible
+          osc.connect(gain);
+          gain.connect(keepAliveAudioCtx.destination);
+          osc.start();
+        }
+        if (keepAliveAudioCtx.state === 'suspended') {
+          keepAliveAudioCtx.resume();
+        }
+        const bgBadge = document.getElementById('bgEngineBadge');
+        bgBadge.textContent = 'Active (24/7 Stream)';
+        bgBadge.className = 'badge badge-green';
+      } catch (e) {}
+    }
+
+    // ==================== SOCKET.IO CONNECTION ====================
+    const socket = io(getServerUrl(), {
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      timeout: 10000
+    });
+
+    const connPill = document.getElementById('connPill');
+
+    function detectPlatformLabel() {
+      if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) {
+        return 'Native Android/iOS APK';
+      }
+      const ua = navigator.userAgent || '';
+      if (/android/i.test(ua)) return 'Android Browser / PWA';
+      if (/iPad|iPhone|iPod/.test(ua)) return 'iOS Safari / PWA';
+      return 'Desktop / Web Browser';
+    }
+
+    function registerWithServer() {
+      const userName = userNameInput.value.trim() || `Mobile-${deviceId.slice(-4)}`;
+      socket.emit('tracker:register', {
+        deviceId,
+        userName,
+        platform: detectPlatformLabel(),
+        trackingMode: isSimulating ? 'Simulated Drive' : 'Live 24/7 GPS',
+        batteryLevel,
+        isCharging,
+        wakeLockActive: Boolean(wakeLockSentinel),
+        latitude: lastPosition ? lastPosition.latitude : null,
+        longitude: lastPosition ? lastPosition.longitude : null,
+        accuracy: lastPosition ? lastPosition.accuracy : null
+      });
+    }
+
+    socket.on('connect', () => {
+      connPill.textContent = '● Live Connected';
+      connPill.className = 'conn-pill connected';
+      registerWithServer();
+      flushOfflineQueue();
+    });
+
+    socket.on('disconnect', () => {
+      connPill.textContent = '● Offline (Buffering)';
+      connPill.className = 'conn-pill offline';
+    });
+
+    // Respond immediately when Admin clicks "Ping Now"
+    socket.on('server:request-location', () => {
+      forceSendNow();
+    });
+
+    function flushOfflineQueue() {
+      const q = getOfflineQueue();
+      if (q.length === 0 || !socket.connected) return;
+      const userName = userNameInput.value.trim() || `Mobile-${deviceId.slice(-4)}`;
+      socket.emit(
+        'location:batch',
+        {
+          deviceId,
+          userName,
+          locations: q
+        },
+        (ack) => {
+          if (ack && ack.ok) {
+            saveOfflineQueue([]);
+          }
+        }
+      );
+    }
+
+    // ==================== CORE TELEMETRY DISPATCHER ====================
+    function transmitCoordinates(coords, sourceLabel = 'GPS') {
+      const payload = {
+        deviceId,
+        userName: userNameInput.value.trim() || `Mobile-${deviceId.slice(-4)}`,
+        latitude: Number(coords.latitude),
+        longitude: Number(coords.longitude),
+        accuracy: Number(coords.accuracy) || 5,
+        speed: coords.speed != null && Number.isFinite(coords.speed) ? Number(coords.speed) : null,
+        heading: coords.heading != null && Number.isFinite(coords.heading) ? Number(coords.heading) : 0,
+        altitude: coords.altitude != null ? Number(coords.altitude) : null,
+        batteryLevel,
+        isCharging,
+        wakeLockActive: Boolean(wakeLockSentinel),
+        platform: detectPlatformLabel(),
+        trackingMode: isSimulating ? 'Simulation Mode' : 'Live 24/7 GPS',
+        timestamp: Date.now()
+      };
+
+      lastPosition = payload;
+
+      // Update UI
+      document.getElementById('latVal').textContent = payload.latitude.toFixed(6);
+      document.getElementById('lngVal').textContent = payload.longitude.toFixed(6);
+      document.getElementById('accVal').textContent = `Accuracy: ±${Math.round(payload.accuracy)} m`;
+      document.getElementById('altVal').textContent = `Heading: ${Math.round(payload.heading || 0)}°`;
+
+      const speedKmh = payload.speed != null && payload.speed > 0 ? (payload.speed * 3.6).toFixed(1) : '0.0';
+      document.getElementById('speedVal').textContent = `${speedKmh} km/h`;
+
+      updateMiniMap(payload.latitude, payload.longitude, payload.accuracy);
+
+      if (socket.connected && sourceLabel !== 'CapacitorNative24x7') {
+        socket.emit('location:update', payload, (ack) => {
+          if (ack && ack.ok) {
+            packetsSent++;
+            document.getElementById('packetsVal').textContent = String(packetsSent);
+            document.getElementById('lastSentText').textContent = `Live synced (${new Date().toLocaleTimeString()})`;
+          }
+        });
+      } else {
+        // For Native Background 24/7 or when WebSocket is disconnected, use HTTP POST + Offline Queue
+        if (!socket.connected) {
+          const q = getOfflineQueue();
+          q.push(payload);
+          saveOfflineQueue(q);
+        }
+
+        fetch(`${getServerUrl()}/api/location`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+          keepalive: true
+        })
+          .then((r) => {
+            if (r.ok) {
+              packetsSent++;
+              document.getElementById('packetsVal').textContent = String(packetsSent);
+              document.getElementById('lastSentText').textContent = `Live synced (${new Date().toLocaleTimeString()})`;
+            }
+          })
+          .catch(() => {});
+      }
+    }
+
+    // ==================== GPS & NATIVE CAPACITOR TRACKING ENGINE ====================
+    function showAlert(msg) {
+      const el = document.getElementById('alertBanner');
+      el.innerHTML = msg;
+      el.style.display = 'block';
+    }
+
+    function hideAlert() {
+      const el = document.getElementById('alertBanner');
+      el.style.display = 'none';
+    }
+
+    function startLiveTracking() {
+      if (isTracking) return;
+      hideAlert();
+
+      if (!('geolocation' in navigator)) {
+        showAlert('Geolocation is not supported by this browser. Switching to Simulation Mode.');
+        startSimulationMode();
+        return;
+      }
+
+      isTracking = true;
+      localStorage.setItem(STORAGE_KEY_AUTOSTART, 'true');
+      updateTrackingButtonsUI();
+
+      requestWakeLock();
+      startSilentAudioKeepAlive();
+
+      // 1. Primary continuous watcher
+      watchId = navigator.geolocation.watchPosition(
+        (pos) => {
+          hideAlert();
+          transmitCoordinates(pos.coords, 'watchPosition');
+        },
+        (err) => {
+          handleGeolocationError(err);
+        },
+        {
+          enableHighAccuracy: true,
+          maximumAge: 0,
+          timeout: 15000
+        }
+      );
+
+      // 2. Active 4-second polling fallback so stationary devices keep streaming 24/7
+      pollTimer = setInterval(() => {
+        if (!isTracking || isSimulating) return;
+        navigator.geolocation.getCurrentPosition(
+          (pos) => transmitCoordinates(pos.coords, 'pollInterval'),
+          () => {},
+          { enableHighAccuracy: true, maximumAge: 2000, timeout: 8000 }
+        );
+      }, 4000);
+
+      // 3. 10-second heartbeat
+      heartbeatTimer = setInterval(() => {
+        if (socket.connected) {
+          socket.emit('tracker:heartbeat', {
+            deviceId,
+            batteryLevel,
+            isCharging,
+            wakeLockActive: Boolean(wakeLockSentinel)
+          });
+        }
+      }, 10000);
+
+      // 4. Native Capacitor Background Geolocation Bridge (if running inside APK)
+      initNativeCapacitorBackgroundBridge();
+    }
+
+    function handleGeolocationError(err) {
+      const isInsecureOrigin =
+        location.protocol !== 'https:' &&
+        location.hostname !== 'localhost' &&
+        location.hostname !== '127.0.0.1';
+
+      if (isInsecureOrigin) {
+        showAlert(
+          `⚠️ <b>Mobile Browser HTTPS Notice:</b> Mobile browsers block real GPS on non-HTTPS LAN URLs (<code>${location.origin}</code>).<br/>` +
+          `• Click <b>"Test Drive Simulation Mode"</b> below to test live streaming right now, OR<br/>` +
+          `• Run an HTTPS tunnel (<code>npx localtunnel --port 3000</code>) or use the Android APK.`
+        );
+      } else if (err.code === 1) {
+        showAlert(
+          `⚠️ <b>Location Permission Denied:</b> Please allow Location Access in your browser site settings (click the lock icon in the address bar) and tap Start again.`
+        );
+      } else {
+        showAlert(`GPS Signal Status: ${err.message}. Retrying with high-accuracy sensor...`);
+      }
+    }
+
+    function initNativeCapacitorBackgroundBridge() {
+      const bgPlugin =
+        window.Capacitor &&
+        window.Capacitor.Plugins &&
+        window.Capacitor.Plugins.BackgroundGeolocation;
+
+      if (!bgPlugin) return;
+
+      bgPlugin.addWatcher(
+        {
+          backgroundMessage: 'Streaming live 24/7 location to Admin Dashboard',
+          backgroundTitle: 'LiveTrack 24/7 Active',
+          requestPermissions: true,
+          stale: false,
+          distanceFilter: 2
+        },
+        (location, error) => {
+          if (error || !location) return;
+          transmitCoordinates(
+            {
+              latitude: location.latitude,
+              longitude: location.longitude,
+              accuracy: location.accuracy,
+              speed: location.speed,
+              heading: location.bearing,
+              altitude: location.altitude
+            },
+            'CapacitorNative24x7'
+          );
+        }
+      );
+    }
+
+    function stopLiveTracking() {
+      isTracking = false;
+      isSimulating = false;
+      localStorage.setItem(STORAGE_KEY_AUTOSTART, 'false');
+
+      if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+        watchId = null;
+      }
+      if (pollTimer) {
+        clearInterval(pollTimer);
+        pollTimer = null;
+      }
+      if (heartbeatTimer) {
+        clearInterval(heartbeatTimer);
+        heartbeatTimer = null;
+      }
+      if (simTimer) {
+        clearInterval(simTimer);
+        simTimer = null;
+      }
+      if (wakeLockSentinel) {
+        wakeLockSentinel.release().catch(() => {});
+        wakeLockSentinel = null;
+      }
+
+      updateTrackingButtonsUI();
+    }
+
+    function handleStartStopClick() {
+      if (isTracking) {
+        stopLiveTracking();
+      } else {
+        startLiveTracking();
+      }
+    }
+
+    function forceSendNow() {
+      if (isSimulating && lastPosition) {
+        transmitCoordinates(lastPosition, 'manualPing');
+        return;
+      }
+      if ('geolocation' in navigator) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => transmitCoordinates(pos.coords, 'manualPing'),
+          (err) => {
+            if (lastPosition) transmitCoordinates(lastPosition, 'cachedPing');
+            else handleGeolocationError(err);
+          },
+          { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
+        );
+      }
+    }
+
+    // ==================== SIMULATION MODE (FOR INSTANT TESTING) ====================
+    let simAngle = Math.random() * Math.PI * 2;
+    let simCenterLat = 28.6139;
+    let simCenterLng = 77.2090;
+
+    function toggleSimulationMode() {
+      if (isSimulating) {
+        stopLiveTracking();
+      } else {
+        startSimulationMode();
+      }
+    }
+
+    function startSimulationMode() {
+      stopLiveTracking();
+      hideAlert();
+      isTracking = true;
+      isSimulating = true;
+
+      if (lastPosition && lastPosition.latitude) {
+        simCenterLat = lastPosition.latitude;
+        simCenterLng = lastPosition.longitude;
+      }
+
+      requestWakeLock();
+      startSilentAudioKeepAlive();
+      updateTrackingButtonsUI();
+
+      const stepSim = () => {
+        simAngle += 0.08;
+        const radius = 0.0045; // ~500m loop
+        const lat = simCenterLat + Math.sin(simAngle) * radius;
+        const lng = simCenterLng + Math.cos(simAngle) * radius;
+        const heading = ((simAngle * 180) / Math.PI + 90) % 360;
+        const speedMps = 8.5 + Math.sin(simAngle * 3) * 2.5; // ~30 km/h
+
+        transmitCoordinates(
+          {
+            latitude: lat,
+            longitude: lng,
+            accuracy: 4.2,
+            speed: speedMps,
+            heading: heading,
+            altitude: 215
+          },
+          'Simulation'
+        );
+      };
+
+      stepSim();
+      simTimer = setInterval(stepSim, 2000);
+    }
+
+    function updateTrackingButtonsUI() {
+      const dot = document.getElementById('beaconDot');
+      const stateLabel = document.getElementById('trackingStateLabel');
+      const startBtn = document.getElementById('startBtn');
+      const startBtnIcon = document.getElementById('startBtnIcon');
+      const startBtnText = document.getElementById('startBtnText');
+      const simBtn = document.getElementById('simBtn');
+
+      if (isTracking) {
+        dot.className = 'beacon-dot active';
+        stateLabel.textContent = isSimulating ? '● SIMULATING LIVE DRIVE' : '● STREAMING 24/7 LIVE';
+        stateLabel.style.color = '#10b981';
+        startBtn.className = 'btn-primary active-tracking';
+        startBtnIcon.textContent = '⏹️';
+        startBtnText.textContent = 'Stop Live Location Streaming';
+      } else {
+        dot.className = 'beacon-dot';
+        stateLabel.textContent = 'Standby';
+        stateLabel.style.color = '#94a3b8';
+        startBtn.className = 'btn-primary';
+        startBtnIcon.textContent = '📍';
+        startBtnText.textContent = 'Allow Permission & Start 24/7 Live Tracking';
+      }
+
+      if (isSimulating) {
+        simBtn.textContent = '⏹️ Stop Simulation Mode';
+        simBtn.style.borderColor = '#10b981';
+        simBtn.style.color = '#34d399';
+      } else {
+        simBtn.textContent = '🚗 Test Drive Simulation Mode (Demo Moving GPS)';
+        simBtn.style.borderColor = '';
+        simBtn.style.color = '';
+      }
+    }
+
+    // ==================== AUTO-START ON PAGE OPEN ====================
+    async function checkAutoStartPermission() {
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js').catch(() => {});
+      }
+
+      const shouldAutoStart = localStorage.getItem(STORAGE_KEY_AUTOSTART) !== 'false';
+      if ( navigator.permissions && navigator.permissions.query ) {
+        try {
+          const status = await navigator.permissions.query({ name: 'geolocation' });
+          if (status.state === 'granted' && shouldAutoStart) {
+            startLiveTracking();
+          }
+        } catch {}
+      }
+    }
+
+    window.addEventListener('load', checkAutoStartPermission);
+  </script>
+</body>
+</html>

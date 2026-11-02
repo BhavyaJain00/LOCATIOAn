@@ -1,0 +1,1195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LiveTrack 24/7 — Admin Command Center</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    :root {
+      --bg-dark: #070b14;
+      --bg-panel: #0f172a;
+      --bg-card: #162038;
+      --bg-card-hover: #1e2b4a;
+      --border: #263554;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent: #10b981;
+      --accent-soft: rgba(16, 185, 129, 0.16);
+      --blue: #3b82f6;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, sans-serif;
+    }
+
+    body {
+      background: var(--bg-dark);
+      color: var(--text-main);
+      height: 100vh;
+      width: 100vw;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Top Navigation Bar */
+    .topbar {
+      height: 60px;
+      background: var(--bg-panel);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+      z-index: 1000;
+      flex-shrink: 0;
+    }
+
+    .topbar-left {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .logo-badge {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      background: rgba(16, 185, 129, 0.16);
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.15rem;
+    }
+
+    .topbar-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+
+    .topbar-sub {
+      font-size: 0.74rem;
+      color: var(--text-muted);
+    }
+
+    .topbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .btn {
+      padding: 8px 14px;
+      border-radius: 9px;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      color: var(--text-main);
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s;
+    }
+
+    .btn:hover {
+      background: var(--bg-card-hover);
+      border-color: #3b4f7a;
+    }
+
+    .btn-accent {
+      background: linear-gradient(135deg, #10b981, #059669);
+      color: #03261e;
+      border: none;
+      font-weight: 700;
+    }
+
+    .btn-accent:hover {
+      opacity: 0.92;
+      background: linear-gradient(135deg, #10b981, #059669);
+    }
+
+    /* Main Workspace Layout */
+    .workspace {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Left Sidebar */
+    .sidebar {
+      width: 390px;
+      background: var(--bg-panel);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      z-index: 500;
+      flex-shrink: 0;
+    }
+
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .stat-card {
+      background: var(--bg-dark);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px;
+      text-align: center;
+    }
+
+    .stat-num {
+      font-size: 1.25rem;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .stat-label {
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    /* Search & Filter Controls */
+    .filter-bar {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .search-input {
+      width: 100%;
+      background: var(--bg-dark);
+      border: 1px solid var(--border);
+      color: var(--text-main);
+      padding: 9px 12px;
+      border-radius: 8px;
+      font-size: 0.84rem;
+      outline: none;
+    }
+
+    .search-input:focus {
+      border-color: var(--accent);
+    }
+
+    .filter-tabs {
+      display: flex;
+      gap: 6px;
+    }
+
+    .tab-btn {
+      flex: 1;
+      padding: 6px 0;
+      border-radius: 7px;
+      border: 1px solid var(--border);
+      background: var(--bg-dark);
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .tab-btn.active {
+      background: var(--bg-card);
+      color: var(--text-main);
+      border-color: var(--accent);
+    }
+
+    /* Device List Scroll Area */
+    .device-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 36px 18px;
+      color: var(--text-muted);
+      font-size: 0.86rem;
+      line-height: 1.5;
+    }
+
+    /* Device Card */
+    .device-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 13px;
+      transition: border-color 0.2s, background 0.2s;
+      cursor: pointer;
+    }
+
+    .device-card:hover {
+      border-color: #3b5384;
+    }
+
+    .device-card.following {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 1px var(--accent);
+    }
+
+    .card-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .device-name-row {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-weight: 700;
+      font-size: 0.94rem;
+    }
+
+    .color-swatch {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .device-meta {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .status-pill {
+      font-size: 0.68rem;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 999px;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      white-space: nowrap;
+    }
+
+    .status-pill.online {
+      background: rgba(16, 185, 129, 0.18);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.4);
+    }
+
+    .status-pill.offline {
+      background: rgba(148, 163, 184, 0.15);
+      color: #94a3b8;
+    }
+
+    .coords-bar {
+      margin-top: 10px;
+      background: var(--bg-dark);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 7px 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.78rem;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .coords-links {
+      display: flex;
+      gap: 8px;
+    }
+
+    .coords-links a,
+    .coords-links span {
+      color: #38bdf8;
+      text-decoration: none;
+      font-size: 0.72rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .telemetry-pills {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+      margin-top: 8px;
+    }
+
+    .t-pill {
+      background: var(--bg-dark);
+      border-radius: 7px;
+      padding: 5px 6px;
+      text-align: center;
+    }
+
+    .t-pill-label {
+      font-size: 0.62rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+    }
+
+    .t-pill-val {
+      font-size: 0.75rem;
+      font-weight: 700;
+      margin-top: 1px;
+    }
+
+    .card-actions {
+      display: flex;
+      gap: 6px;
+      margin-top: 10px;
+    }
+
+    .mini-btn {
+      flex: 1;
+      padding: 6px 8px;
+      border-radius: 7px;
+      border: 1px solid var(--border);
+      background: var(--bg-panel);
+      color: var(--text-main);
+      font-size: 0.72rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .mini-btn:hover {
+      background: #1e293b;
+    }
+
+    .mini-btn.active-follow {
+      background: rgba(16, 185, 129, 0.2);
+      color: #34d399;
+      border-color: var(--accent);
+    }
+
+    /* Map Container */
+    .map-wrapper {
+      flex: 1;
+      position: relative;
+      height: 100%;
+    }
+
+    #adminMap {
+      width: 100%;
+      height: 100%;
+      background: #060911;
+    }
+
+    /* Floating Map Layer Switcher */
+    .map-overlay-controls {
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      z-index: 800;
+      display: flex;
+      gap: 6px;
+      background: rgba(15, 23, 42, 0.92);
+      backdrop-filter: blur(8px);
+      padding: 6px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+    }
+
+    .layer-btn {
+      padding: 6px 10px;
+      border-radius: 7px;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .layer-btn.active {
+      background: var(--bg-card);
+      color: var(--text-main);
+      border: 1px solid var(--border);
+    }
+
+    /* Following Banner on Map */
+    .follow-banner {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 800;
+      background: rgba(15, 23, 42, 0.95);
+      border: 1px solid var(--accent);
+      padding: 8px 16px;
+      border-radius: 999px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      display: none;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.5);
+    }
+
+    /* Custom Live Map Marker */
+    .live-marker-wrap {
+      position: relative;
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .live-marker-pulse {
+      position: absolute;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      animation: markerPulse 2s infinite ease-out;
+    }
+
+    @keyframes markerPulse {
+      0% { transform: scale(0.6); opacity: 0.9; }
+      100% { transform: scale(2.1); opacity: 0; }
+    }
+
+    .live-marker-core {
+      position: relative;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      border: 3px solid #ffffff;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
+      z-index: 2;
+    }
+
+    .live-marker-label {
+      position: absolute;
+      bottom: 36px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(15, 23, 42, 0.92);
+      color: #f8fafc;
+      border: 1px solid #334155;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      white-space: nowrap;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.45);
+      pointer-events: none;
+    }
+
+    /* Share / QR Modal */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.72);
+      backdrop-filter: blur(4px);
+      z-index: 2000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+
+    .modal-box {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      width: 100%;
+      max-width: 480px;
+      padding: 22px;
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+
+    .qr-box {
+      background: #ffffff;
+      padding: 14px;
+      border-radius: 12px;
+      width: fit-content;
+      margin: 14px auto;
+    }
+
+    .url-copy-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    @media (max-width: 860px) {
+      .workspace {
+        flex-direction: column-reverse;
+      }
+      .sidebar {
+        width: 100%;
+        height: 46%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Top Command Header -->
+  <header class="topbar">
+    <div class="topbar-left">
+      <div class="logo-badge">🛰️</div>
+      <div>
+        <div class="topbar-title">LiveTrack 24/7 — Admin Map Dashboard</div>
+        <div id="serverStatusText" class="topbar-sub">Connecting to real-time WebSocket server...</div>
+      </div>
+    </div>
+
+    <div class="topbar-actions">
+      <button class="btn" onclick="spawnAdminSimulator()">
+        🤖 + Simulate Moving User
+      </button>
+      <button class="btn" onclick="pingAllDevices()">
+        ⚡ Ping All Devices
+      </button>
+      <button class="btn" onclick="fitAllMarkers()">
+        🗺️ Fit All on Map
+      </button>
+      <button class="btn btn-accent" onclick="openShareModal()">
+        📱 Share Tracker Link / QR
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Workspace -->
+  <div class="workspace">
+    <!-- Left Device Command Sidebar -->
+    <aside class="sidebar">
+      <div class="stats-row">
+        <div class="stat-card">
+          <div id="statTotal" class="stat-num">0</div>
+          <div class="stat-label">Total Devices</div>
+        </div>
+        <div class="stat-card">
+          <div id="statOnline" class="stat-num" style="color: var(--accent);">0</div>
+          <div class="stat-label">Live 24/7 Now</div>
+        </div>
+        <div class="stat-card">
+          <div id="statOffline" class="stat-num" style="color: var(--text-muted);">0</div>
+          <div class="stat-label">Offline</div>
+        </div>
+      </div>
+
+      <div class="filter-bar">
+        <input
+          id="searchInput"
+          type="text"
+          class="search-input"
+          placeholder="Search by user name or device ID..."
+          oninput="renderDeviceList()"
+        />
+        <div class="filter-tabs">
+          <button id="tabAll" class="tab-btn active" onclick="setFilterMode('all')">All Devices</button>
+          <button id="tabOnline" class="tab-btn" onclick="setFilterMode('online')">● Live Now</button>
+          <button id="tabOffline" class="tab-btn" onclick="setFilterMode('offline')">○ Offline</button>
+        </div>
+      </div>
+
+      <div id="deviceListContainer" class="device-list">
+        <div class="empty-state">
+          No devices tracked yet.<br /><br />
+          Open <b>/track</b> on any phone or click <b>"+ Simulate Moving User"</b> in the top bar to watch live 24/7 tracking!
+        </div>
+      </div>
+    </aside>
+
+    <!-- Interactive Live Map -->
+    <main class="map-wrapper">
+      <div class="map-overlay-controls">
+        <button id="layerDark" class="layer-btn active" onclick="switchMapLayer('dark')">Dark Tactical</button>
+        <button id="layerStreet" class="layer-btn" onclick="switchMapLayer('street')">Street Map</button>
+        <button id="layerSat" class="layer-btn" onclick="switchMapLayer('sat')">Satellite</button>
+      </div>
+
+      <div id="followBanner" class="follow-banner">
+        <span id="followBannerText">🎯 Camera Locked on Device</span>
+        <button class="mini-btn" style="flex:none;" onclick="setFollowedDevice(null)">Unlock</button>
+      </div>
+
+      <div id="adminMap"></div>
+    </main>
+  </div>
+
+  <!-- Share Link & QR Code Modal -->
+  <div id="shareModal" class="modal-backdrop" onclick="if(event.target===this) closeShareModal()">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 style="font-size:1.05rem;">📱 Connect a User Device (24/7 Tracker)</h3>
+        <button class="btn" onclick="closeShareModal()">✕</button>
+      </div>
+      <p style="font-size:0.82rem; color:var(--text-muted); line-height:1.45;">
+        Send this link or scan the QR code on any mobile device. Once opened and location permission is allowed, their live coordinates will stream here 24/7.
+      </p>
+
+      <div style="margin-top:12px;">
+        <label style="font-size:0.74rem; color:var(--text-muted);">Optional: Pre-assign User / Rider Name in Link</label>
+        <div class="url-copy-row">
+          <input
+            id="customLinkName"
+            type="text"
+            class="search-input"
+            placeholder="e.g. Delivery-Rider-01"
+            oninput="updateShareUrlDisplay()"
+          />
+        </div>
+      </div>
+
+      <div class="qr-box">
+        <img id="qrImage" src="" alt="Tracker QR Code" width="170" height="170" style="display:block;" />
+      </div>
+
+      <div class="url-copy-row">
+        <input id="shareUrlInput" type="text" class="search-input" readonly />
+        <button class="btn btn-accent" onclick="copyShareUrl()">Copy Link</button>
+      </div>
+
+      <div style="margin-top:12px; font-size:0.74rem; color:var(--text-muted); line-height:1.45;">
+        💡 <b>Tip for Remote Mobile Networks (4G/5G):</b> To open on phones outside your Wi-Fi or with HTTPS GPS enabled, run <code>npx localtunnel --port 3000</code> and share the generated <code>https://...</code> URL.
+      </div>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    // ==================== STATE ====================
+    const devicesMap = new Map(); // deviceId -> device object
+    const mapLayersByDevice = new Map(); // deviceId -> { marker, circle, polyline, color }
+    let filterMode = 'all';
+    let followedDeviceId = null;
+    let baseShareUrl = `${window.location.origin}/track`;
+    let hasInitialAutoFit = false;
+
+    const DEVICE_COLORS = [
+      '#10b981', '#3b82f6', '#f59e0b', '#ec4899',
+      '#8b5cf6', '#06b6d4', '#f97316', '#84cc16'
+    ];
+    let colorIndex = 0;
+
+    function getDeviceColor(deviceId) {
+      if (mapLayersByDevice.has(deviceId)) {
+        return mapLayersByDevice.get(deviceId).color;
+      }
+      const color = DEVICE_COLORS[colorIndex % DEVICE_COLORS.length];
+      colorIndex++;
+      return color;
+    }
+
+    // ==================== LEAFLET MAP INITIALIZATION ====================
+    const map = L.map('adminMap', {
+      zoomControl: true
+    }).setView([28.6139, 77.2090], 5);
+
+    const tileLayers = {
+      dark: L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        maxZoom: 20,
+        attribution: '&copy; OpenStreetMap & CartoDB'
+      }),
+      street: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap contributors'
+      }),
+      sat: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        maxZoom: 19,
+        attribution: '&copy; Esri World Imagery'
+      })
+    };
+
+    let currentTileLayer = tileLayers.dark;
+    currentTileLayer.addTo(map);
+
+    function switchMapLayer(key) {
+      map.removeLayer(currentTileLayer);
+      currentTileLayer = tileLayers[key] || tileLayers.dark;
+      currentTileLayer.addTo(map);
+
+      document.getElementById('layerDark').classList.toggle('active', key === 'dark');
+      document.getElementById('layerStreet').classList.toggle('active', key === 'street');
+      document.getElementById('layerSat').classList.toggle('active', key === 'sat');
+    }
+
+    // ==================== SOCKET.IO REAL-TIME STREAM ====================
+    const socket = io();
+    const serverStatusText = document.getElementById('serverStatusText');
+
+    socket.on('connect', () => {
+      serverStatusText.textContent = '● Live WebSocket Connected — Streaming 24/7 Telemetry';
+      serverStatusText.style.color = '#34d399';
+      socket.emit('admin:join');
+    });
+
+    socket.on('disconnect', () => {
+      serverStatusText.textContent = '○ Reconnecting to server...';
+      serverStatusText.style.color = '#fbbf24';
+    });
+
+    socket.on('devices:snapshot', ({ devices }) => {
+      devicesMap.clear();
+      if (Array.isArray(devices)) {
+        devices.forEach((dev) => {
+          devicesMap.set(dev.deviceId, dev);
+          syncDeviceOnMap(dev);
+        });
+      }
+      renderDeviceList();
+      if (!hasInitialAutoFit && devicesMap.size > 0) {
+        hasInitialAutoFit = true;
+        fitAllMarkers();
+      }
+    });
+
+    socket.on('device:updated', (dev) => {
+      if (!dev || !dev.deviceId) return;
+      devicesMap.set(dev.deviceId, dev);
+      syncDeviceOnMap(dev);
+      renderDeviceList();
+
+      if (followedDeviceId === dev.deviceId && dev.latitude != null && dev.longitude != null) {
+        map.panTo([dev.latitude, dev.longitude], { animate: true });
+      }
+    });
+
+    socket.on('device:deleted', ({ deviceId }) => {
+      devicesMap.delete(deviceId);
+      removeDeviceFromMap(deviceId);
+      if (followedDeviceId === deviceId) {
+        setFollowedDevice(null);
+      }
+      renderDeviceList();
+    });
+
+    // ==================== MAP MARKERS & TRAILS ====================
+    function createDeviceMarkerHtml(dev, color) {
+      const isOnline = dev.status === 'online';
+      const coreColor = isOnline ? color : '#64748b';
+      const speedKmh = dev.speed ? (dev.speed * 3.6).toFixed(1) : '0.0';
+      const speedTag = isOnline && Number(speedKmh) > 0.5 ? ` • ${speedKmh} km/h` : '';
+
+      return `
+        <div class="live-marker-wrap">
+          <div class="live-marker-label">${escapeHtml(dev.userName)}${speedTag}</div>
+          ${isOnline ? `<div class="live-marker-pulse" style="background:${color};"></div>` : ''}
+          <div class="live-marker-core" style="background:${coreColor};"></div>
+        </div>
+      `;
+    }
+
+    function buildPopupHtml(dev) {
+      const speedKmh = dev.speed ? (dev.speed * 3.6).toFixed(1) : '0.0';
+      const distKm = ((dev.totalDistanceMeters || 0) / 1000).toFixed(2);
+      const lat = dev.latitude != null ? dev.latitude.toFixed(6) : 'N/A';
+      const lng = dev.longitude != null ? dev.longitude.toFixed(6) : 'N/A';
+      return `
+        <div style="min-width:200px; font-family:sans-serif; line-height:1.5;">
+          <div style="font-weight:700; font-size:14px; margin-bottom:4px;">${escapeHtml(dev.userName)}</div>
+          <div style="font-size:12px; color:#475569;">ID: ${escapeHtml(dev.deviceId)} (${escapeHtml(dev.platform || 'Web')})</div>
+          <hr style="margin:6px 0; border:none; border-top:1px solid #e2e8f0;" />
+          <div style="font-size:12px;"><b>Status:</b> ${dev.status === 'online' ? '🟢 LIVE NOW' : '⚪ OFFLINE'}</div>
+          <div style="font-size:12px;"><b>Coords:</b> ${lat}, ${lng}</div>
+          <div style="font-size:12px;"><b>Speed:</b> ${speedKmh} km/h | <b>Accuracy:</b> ±${Math.round(dev.accuracy || 0)}m</div>
+          <div style="font-size:12px;"><b>Distance Traveled:</b> ${distKm} km</div>
+          <div style="font-size:12px;"><b>Battery:</b> ${dev.batteryLevel != null ? dev.batteryLevel + '%' : 'N/A'} ${dev.isCharging ? '⚡' : ''}</div>
+          <div style="margin-top:6px;">
+            <a href="https://www.google.com/maps?q=${lat},${lng}" target="_blank" style="color:#2563eb; font-weight:600; font-size:12px;">Open in Google Maps ↗</a>
+          </div>
+        </div>
+      `;
+    }
+
+    function syncDeviceOnMap(dev) {
+      if (dev.latitude == null || dev.longitude == null) return;
+      const lat = Number(dev.latitude);
+      const lng = Number(dev.longitude);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+
+      const color = getDeviceColor(dev.deviceId);
+      const trailLatLngs = Array.isArray(dev.trail)
+        ? dev.trail.map((pt) => [pt.lat, pt.lng])
+        : [[lat, lng]];
+
+      const icon = L.divIcon({
+        className: '',
+        html: createDeviceMarkerHtml(dev, color),
+        iconSize: [36, 36],
+        iconAnchor: [18, 18]
+      });
+
+      if (!mapLayersByDevice.has(dev.deviceId)) {
+        const polyline = L.polyline(trailLatLngs, {
+          color: color,
+          weight: 3.5,
+          opacity: 0.85
+        }).addTo(map);
+
+        const circle = L.circle([lat, lng], {
+          radius: dev.accuracy || 10,
+          color: color,
+          fillColor: color,
+          fillOpacity: 0.1,
+          weight: 1
+        }).addTo(map);
+
+        const marker = L.marker([lat, lng], { icon }).addTo(map);
+        marker.bindPopup(buildPopupHtml(dev));
+
+        mapLayersByDevice.set(dev.deviceId, { marker, circle, polyline, color });
+      } else {
+        const entry = mapLayersByDevice.get(dev.deviceId);
+        entry.marker.setLatLng([lat, lng]);
+        entry.marker.setIcon(icon);
+        entry.marker.setPopupContent(buildPopupHtml(dev));
+
+        entry.circle.setLatLng([lat, lng]);
+        entry.circle.setRadius(dev.accuracy || 10);
+
+        entry.polyline.setLatLngs(trailLatLngs);
+      }
+    }
+
+    function removeDeviceFromMap(deviceId) {
+      const entry = mapLayersByDevice.get(deviceId);
+      if (!entry) return;
+      map.removeLayer(entry.marker);
+      map.removeLayer(entry.circle);
+      map.removeLayer(entry.polyline);
+      mapLayersByDevice.delete(deviceId);
+    }
+
+    function fitAllMarkers() {
+      const coords = [];
+      devicesMap.forEach((dev) => {
+        if (dev.latitude != null && dev.longitude != null) {
+          coords.push([dev.latitude, dev.longitude]);
+        }
+      });
+      if (coords.length === 0) return;
+      if (coords.length === 1) {
+        map.setView(coords[0], 16, { animate: true });
+      } else {
+        map.fitBounds(coords, { padding: [50, 50], maxZoom: 17 });
+      }
+    }
+
+    // ==================== SIDEBAR RENDERING ====================
+    function setFilterMode(mode) {
+      filterMode = mode;
+      document.getElementById('tabAll').classList.toggle('active', mode === 'all');
+      document.getElementById('tabOnline').classList.toggle('active', mode === 'online');
+      document.getElementById('tabOffline').classList.toggle('active', mode === 'offline');
+      renderDeviceList();
+    }
+
+    function formatTimeAgo(ts) {
+      if (!ts) return 'Never';
+      const diffSec = Math.max(0, Math.floor((Date.now() - ts) / 1000));
+      if (diffSec < 5) return 'Just now';
+      if (diffSec < 60) return `${diffSec}s ago`;
+      const mins = Math.floor(diffSec / 60);
+      if (mins < 60) return `${mins}m ago`;
+      const hrs = Math.floor(mins / 60);
+      return `${hrs}h ago`;
+    }
+
+    function escapeHtml(str) {
+      return String(str || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function renderDeviceList() {
+      const all = Array.from(devicesMap.values()).sort((a, b) => {
+        if (a.status === 'online' && b.status !== 'online') return -1;
+        if (a.status !== 'online' && b.status === 'online') return 1;
+        return (b.lastSeen || 0) - (a.lastSeen || 0);
+      });
+
+      const onlineCount = all.filter((d) => d.status === 'online').length;
+      document.getElementById('statTotal').textContent = String(all.length);
+      document.getElementById('statOnline').textContent = String(onlineCount);
+      document.getElementById('statOffline').textContent = String(all.length - onlineCount);
+
+      const query = document.getElementById('searchInput').value.trim().toLowerCase();
+      const filtered = all.filter((dev) => {
+        if (filterMode === 'online' && dev.status !== 'online') return false;
+        if (filterMode === 'offline' && dev.status === 'online') return false;
+        if (query) {
+          const hay = `${dev.userName} ${dev.deviceId} ${dev.platform}`.toLowerCase();
+          return hay.includes(query);
+        }
+        return true;
+      });
+
+      const container = document.getElementById('deviceListContainer');
+      if (filtered.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state">
+            No matching devices.<br/><br/>
+            Open <b>/track</b> on a device or click <b>"+ Simulate Moving User"</b> above to test live tracking.
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = filtered
+        .map((dev) => {
+          const isOnline = dev.status === 'online';
+          const color = getDeviceColor(dev.deviceId);
+          const hasCoords = dev.latitude != null && dev.longitude != null;
+          const latStr = hasCoords ? Number(dev.latitude).toFixed(6) : '--.------';
+          const lngStr = hasCoords ? Number(dev.longitude).toFixed(6) : '--.------';
+          const speedKmh = dev.speed ? (dev.speed * 3.6).toFixed(1) : '0.0';
+          const distStr =
+            (dev.totalDistanceMeters || 0) >= 1000
+              ? `${((dev.totalDistanceMeters || 0) / 1000).toFixed(2)} km`
+              : `${dev.totalDistanceMeters || 0} m`;
+          const batStr =
+            dev.batteryLevel != null
+              ? `${dev.batteryLevel}%${dev.isCharging ? '⚡' : ''}`
+              : 'N/A';
+          const isFollowing = followedDeviceId === dev.deviceId;
+
+          return `
+            <div class="device-card ${isFollowing ? 'following' : ''}" onclick="focusDeviceOnMap('${escapeHtml(dev.deviceId)}')">
+              <div class="card-top">
+                <div>
+                  <div class="device-name-row">
+                    <span class="color-swatch" style="background:${color};"></span>
+                    <span>${escapeHtml(dev.userName)}</span>
+                    <span style="font-size:0.72rem; color:#38bdf8; cursor:pointer;" title="Rename" onclick="event.stopPropagation(); promptRenameDevice('${escapeHtml(dev.deviceId)}', '${escapeHtml(dev.userName)}')">✎</span>
+                  </div>
+                  <div class="device-meta">
+                    ${escapeHtml(dev.deviceId)} • ${escapeHtml(dev.platform || 'Web')} • Updated ${formatTimeAgo(dev.lastSeen)}
+                  </div>
+                </div>
+                <span class="status-pill ${isOnline ? 'online' : 'offline'}">
+                  ${isOnline ? '● LIVE 24/7' : '○ OFFLINE'}
+                </span>
+              </div>
+
+              <div class="coords-bar" onclick="event.stopPropagation()">
+                <span>📍 ${latStr}, ${lngStr}</span>
+                <div class="coords-links">
+                  <span onclick="copyCoords('${latStr}, ${lngStr}')">Copy</span>
+                  ${hasCoords ? `<a href="https://www.google.com/maps?q=${latStr},${lngStr}" target="_blank">GMaps ↗</a>` : ''}
+                </div>
+              </div>
+
+              <div class="telemetry-pills">
+                <div class="t-pill">
+                  <div class="t-pill-label">Speed</div>
+                  <div class="t-pill-val">${speedKmh} km/h</div>
+                </div>
+                <div class="t-pill">
+                  <div class="t-pill-label">Accuracy</div>
+                  <div class="t-pill-val">±${Math.round(dev.accuracy || 0)}m</div>
+                </div>
+                <div class="t-pill">
+                  <div class="t-pill-label">Distance</div>
+                  <div class="t-pill-val">${distStr}</div>
+                </div>
+                <div class="t-pill">
+                  <div class="t-pill-label">Battery</div>
+                  <div class="t-pill-val">${batStr}</div>
+                </div>
+              </div>
+
+              <div class="card-actions" onclick="event.stopPropagation()">
+                <button class="mini-btn ${isFollowing ? 'active-follow' : ''}" onclick="toggleFollowDevice('${escapeHtml(dev.deviceId)}')">
+                  ${isFollowing ? '🎯 Following' : '🎯 Follow'}
+                </button>
+                <button class="mini-btn" onclick="pingSingleDevice('${escapeHtml(dev.deviceId)}')">
+                  ⚡ Ping
+                </button>
+                <button class="mini-btn" onclick="clearDeviceTrail('${escapeHtml(dev.deviceId)}')">
+                  🧹 Clear Path
+                </button>
+                <button class="mini-btn" style="flex:0.45; color:#f87171;" onclick="deleteDevice('${escapeHtml(dev.deviceId)}')">
+                  🗑️
+                </button>
+              </div>
+            </div>
+          `;
+        })
+        .join('');
+    }
+
+    // Refresh "X seconds ago" timestamps every 5 seconds
+    setInterval(renderDeviceList, 5000);
+
+    // ==================== ADMIN DEVICE CONTROLS ====================
+    function focusDeviceOnMap(deviceId) {
+      const dev = devicesMap.get(deviceId);
+      if (!dev || dev.latitude == null || dev.longitude == null) return;
+      map.setView([dev.latitude, dev.longitude], Math.max(map.getZoom(), 16), { animate: true });
+      const entry = mapLayersByDevice.get(deviceId);
+      if (entry && entry.marker) {
+        entry.marker.openPopup();
+      }
+    }
+
+    function setFollowedDevice(deviceId) {
+      followedDeviceId = deviceId;
+      const banner = document.getElementById('followBanner');
+      if (deviceId && devicesMap.has(deviceId)) {
+        const dev = devicesMap.get(deviceId);
+        document.getElementById('followBannerText').textContent = `🎯 Camera Locked on ${dev.userName}`;
+        banner.style.display = 'flex';
+        focusDeviceOnMap(deviceId);
+      } else {
+        followedDeviceId = null;
+        banner.style.display = 'none';
+      }
+      renderDeviceList();
+    }
+
+    function toggleFollowDevice(deviceId) {
+      if (followedDeviceId === deviceId) {
+        setFollowedDevice(null);
+      } else {
+        setFollowedDevice(deviceId);
+      }
+    }
+
+    function pingSingleDevice(deviceId) {
+      socket.emit('admin:ping-device', { deviceId });
+    }
+
+    function pingAllDevices() {
+      socket.emit('admin:ping-device', {});
+    }
+
+    function promptRenameDevice(deviceId, currentName) {
+      const newName = prompt('Enter new display name for this device:', currentName);
+      if (newName && newName.trim()) {
+        socket.emit('admin:rename-device', { deviceId, userName: newName.trim() });
+      }
+    }
+
+    function clearDeviceTrail(deviceId) {
+      socket.emit('admin:clear-trail', { deviceId });
+    }
+
+    function deleteDevice(deviceId) {
+      socket.emit('admin:delete-device', { deviceId });
+    }
+
+    function copyCoords(text) {
+      navigator.clipboard.writeText(text).catch(() => {});
+    }
+
+    // ==================== BUILT-IN ADMIN MULTI-DEVICE SIMULATOR ====================
+    const adminSimulators = [];
+
+    function spawnAdminSimulator() {
+      const idx = adminSimulators.length + 1;
+      const simId = `SIM-UNIT-0${idx}`;
+      const simName = `Field Agent 0${idx} (Sim)`;
+
+      // Pick a starting point near New Delhi / Mumbai / Bengaluru or current map center
+      const center = map.getCenter();
+      const baseLat = center.lat + (Math.random() - 0.5) * 0.02;
+      const baseLng = center.lng + (Math.random() - 0.5) * 0.02;
+      let angle = Math.random() * Math.PI * 2;
+
+      const sendStep = () => {
+        angle += 0.07;
+        const lat = baseLat + Math.sin(angle) * 0.005;
+        const lng = baseLng + Math.cos(angle * 0.8) * 0.005;
+        const speedMps = 9 + Math.sin(angle * 2) * 3;
+        const heading = ((angle * 180) / Math.PI + 90) % 360;
+
+        fetch('/api/location', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            deviceId: simId,
+            userName: simName,
+            latitude: lat,
+            longitude: lng,
+            accuracy: 4,
+            speed: speedMps,
+            heading: heading,
+            batteryLevel: Math.max(25, 96 - idx * 7),
+            isCharging: idx % 2 === 0,
+            platform: 'Simulated 24/7 GPS Unit',
+            timestamp: Date.now()
+          })
+        }).catch(() => {});
+      };
+
+      sendStep();
+      const timer = setInterval(sendStep, 2000);
+      adminSimulators.push({ simId, timer });
+
+      setTimeout(() => {
+        focusDeviceOnMap(simId);
+      }, 350);
+    }
+
+    // ==================== SHARE LINK & QR CODE MODAL ====================
+    async function initServerShareInfo() {
+      try {
+        const res = await fetch('/api/server-info');
+        const info = await res.json();
+        if (info && info.recommendedLanUrl) {
+          baseShareUrl = info.recommendedLanUrl;
+        }
+      } catch {}
+    }
+    initServerShareInfo();
+
+    function updateShareUrlDisplay() {
+      const customName = document.getElementById('customLinkName').value.trim();
+      const url = customName
+        ? `${baseShareUrl}?name=${encodeURIComponent(customName)}`
+        : baseShareUrl;
+      document.getElementById('shareUrlInput').value = url;
+      document.getElementById('qrImage').src =
+        `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(url)}`;
+    }
+
+    function openShareModal() {
+      updateShareUrlDisplay();
+      document.getElementById('shareModal').style.display = 'flex';
+    }
+
+    function closeShareModal() {
+      document.getElementById('shareModal').style.display = 'none';
+    }
+
+    function copyShareUrl() {
+      const input = document.getElementById('shareUrlInput');
+      input.select();
+      navigator.clipboard.writeText(input.value).catch(() => {});
+    }
+  </script>
+</body>
+</html>

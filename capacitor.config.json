@@ -1,0 +1,9 @@
+{
+  "appId": "com.livetrack24x7.app",
+  "appName": "LiveTrack 24/7",
+  "webDir": "public",
+  "server": {
+    "cleartext": true,
+    "allowNavigation": ["*"]
+  }
+}
