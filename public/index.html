@@ -459,7 +459,7 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
     // ==================== DEVICE IDENTITY & SERVER CONFIG ====================
-    const DEFAULT_APK_SERVER_URL = 'http://192.168.0.149:3000'; // Change to your Render/Railway HTTPS URL for global 4G/5G APK
+    const DEFAULT_APK_SERVER_URL = 'https://locatioan.onrender.com'; // Pre-configured with live Render server URL
     const STORAGE_KEY_ID = 'lt_24x7_device_id';
     const STORAGE_KEY_NAME = 'lt_24x7_user_name';
     const STORAGE_KEY_QUEUE = 'lt_24x7_offline_queue';
@@ -477,13 +477,13 @@
 
     function getServerUrl() {
       const saved = localStorage.getItem(STORAGE_KEY_SERVER_URL);
-      if (saved && saved.trim()) {
+      if (saved && saved.trim() && !saved.includes('192.168.0.149')) {
         return saved.trim().replace(/\/+$/, '');
       }
       if (isRunningInNativeApk()) {
-        return DEFAULT_APK_SERVER_URL;
+        return DEFAULT_APK_SERVER_URL.replace(/\/+$/, '');
       }
-      return window.location.origin;
+      return window.location.origin.replace(/\/+$/, '');
     }
 
     const serverUrlInput = document.getElementById('serverUrlInput');

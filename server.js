@@ -249,11 +249,17 @@ app.get('/admin', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'admin.html'));
 });
 
+// Health endpoint for 24/7 cloud uptime monitoring
+app.get('/health', (req, res) => {
+  res.json({ ok: true, uptime: process.uptime(), timestamp: Date.now() });
+});
+
 // REST API: Server & Network Info (for QR code & shareable links)
 app.get('/api/server-info', (req, res) => {
   const lanAddresses = getLocalIPv4Addresses();
   const hostHeader = req.headers.host || `localhost:${PORT}`;
   const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'http';
+  const isLocalhost = hostHeader.startsWith('localhost') || hostHeader.startsWith('127.0.0.1');
 
   const allDevices = Array.from(devices.values());
   const onlineCount = allDevices.filter((d) => d.status === 'online').length;
@@ -264,9 +270,11 @@ app.get('/api/server-info', (req, res) => {
     host: hostHeader,
     lanAddresses,
     recommendedLanUrl:
-      lanAddresses.length > 0
-        ? `http://${lanAddresses[0].address}:${PORT}/track`
-        : `${protocol}://${hostHeader}/track`,
+      !isLocalhost
+        ? `${protocol}://${hostHeader}/track`
+        : lanAddresses.length > 0
+          ? `http://${lanAddresses[0].address}:${PORT}/track`
+          : `${protocol}://${hostHeader}/track`,
     totalDevices: allDevices.length,
     onlineDevices: onlineCount,
     serverTime: Date.now()
@@ -538,6 +546,12 @@ setInterval(() => {
     }
   });
 }, 15000);
+
+// Keep Render free tier awake 24/7 by pinging /health every 10 minutes
+const RENDER_EXTERNAL_URL = process.env.RENDER_EXTERNAL_URL || 'https://locatioan.onrender.com';
+setInterval(() => {
+  fetch(`${RENDER_EXTERNAL_URL}/health`).catch(() => {});
+}, 10 * 60 * 1000);
 
 server.listen(PORT, '0.0.0.0', () => {
   const lanIps = getLocalIPv4Addresses();
